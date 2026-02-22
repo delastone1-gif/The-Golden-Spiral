@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Golden Spiral — Fibonacci Visualized</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #C5A356;
+    --gold-light: #E8D5A3;
+    --gold-dim: #8B7340;
+    --bg-deep: #0A0A0F;
+    --bg-card: #12121A;
+    --text: #E8E4DC;
+    --text-dim: #7A7670;
+    --spiral-glow: rgba(197, 163, 86, 0.3);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg-deep);
+    color: var(--text);
+    font-family: 'Cormorant Garamond', serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grain overlay */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 1000;
+  }
+
+  header {
+    text-align: center;
+    padding: 3rem 2rem 1rem;
+    position: relative;
+  }
+
+  header h1 {
+    font-size: clamp(2.5rem, 5vw, 4.5rem);
+    font-weight: 300;
+    letter-spacing: 0.15em;
+    color: var(--gold-light);
+    text-transform: uppercase;
+  }
+
+  header .phi {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: clamp(1rem, 2vw, 1.4rem);
+    color: var(--gold-dim);
+    margin-top: 0.5rem;
+    letter-spacing: 0.3em;
+    font-weight: 300;
+  }
+
+  header .subtitle {
+    font-size: 1.15rem;
+    color: var(--text-dim);
+    margin-top: 1rem;
+    font-weight: 300;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+    line-height: 1.6;
+  }
+
+  .main-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2rem;
+    padding: 1rem 2rem 3rem;
+  }
+
+  /* Controls */
+  .controls {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    letter-spacing: 0.1em;
+    padding: 0.7rem 1.6rem;
+    border: 1px solid var(--gold-dim);
+    background: transparent;
+    color: var(--gold-light);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+  }
+
+  .btn:hover {
+    background: var(--gold);
+    color: var(--bg-deep);
+    box-shadow: 0 0 20px var(--spiral-glow);
+  }
+
+  .btn.active {
+    background: var(--gold-dim);
+    color: var(--bg-deep);
+  }
+
+  .btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  .speed-control {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+  }
+
+  .speed-control input[type="range"] {
+    -webkit-appearance: none;
+    width: 100px;
+    height: 2px;
+    background: var(--gold-dim);
+    outline: none;
+  }
+
+  .speed-control input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    background: var(--gold);
+    border-radius: 50%;
+    cursor: pointer;
+  }
+
+  /* Canvas area */
+  .canvas-wrapper {
+    position: relative;
+    background: var(--bg-card);
+    border: 1px solid rgba(197, 163, 86, 0.15);
+    box-shadow: 0 0 60px rgba(0,0,0,0.5), inset 0 0 60px rgba(0,0,0,0.3);
+  }
+
+  canvas {
+    display: block;
+  }
+
+  /* Info panel */
+  .info-panel {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    max-width: 900px;
+    width: 100%;
+    padding: 0 1rem;
+  }
+
+  .info-card {
+    background: var(--bg-card);
+    border: 1px solid rgba(197, 163, 86, 0.1);
+    padding: 1.5rem;
+    text-align: center;
+  }
+
+  .info-card .label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+  }
+
+  .info-card .value {
+    font-size: 1.8rem;
+    font-weight: 300;
+    color: var(--gold-light);
+  }
+
+  .info-card .detail {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    margin-top: 0.3rem;
+    font-weight: 300;
+  }
+
+  /* Sequence display */
+  .sequence {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    max-width: 900px;
+    text-align: center;
+    line-height: 2;
+    padding: 0 1rem;
+  }
+
+  .sequence span {
+    transition: color 0.4s ease, text-shadow 0.4s ease;
+    margin: 0 0.15rem;
+  }
+
+  .sequence span.active {
+    color: var(--gold);
+    text-shadow: 0 0 10px var(--spiral-glow);
+  }
+
+  .sequence span.current {
+    color: var(--gold-light);
+    text-shadow: 0 0 15px var(--gold);
+    font-weight: 400;
+  }
+
+  /* Footer explanation */
+  .explanation {
+    max-width: 700px;
+    text-align: center;
+    padding: 2rem 1rem;
+    line-height: 1.8;
+    color: var(--text-dim);
+    font-size: 1.05rem;
+    font-weight: 300;
+  }
+
+  .explanation em {
+    color: var(--gold-dim);
+    font-style: normal;
+  }
+
+  @media (max-width: 600px) {
+    .controls { gap: 0.5rem; }
+    .btn { padding: 0.5rem 1rem; font-size: 0.7rem; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>The Golden Spiral</h1>
+  <div class="phi">φ = 1.6180339887...</div>
+  <p class="subtitle">Watch the Fibonacci sequence build itself, square by square, converging toward the divine proportion.</p>
+</header>
+
+<div class="main-container">
+  <div class="controls">
+    <button class="btn" id="btnPlay">▶ Play</button>
+    <button class="btn" id="btnStep">+ Step</button>
+    <button class="btn" id="btnReset">↺ Reset</button>
+    <button class="btn" id="btnToggleSpiral">Spiral: On</button>
+    <button class="btn" id="btnToggleNumbers">Numbers: On</button>
+    <button class="btn" id="btnToggleDecomp">Sum Split: On</button>
+    <div class="speed-control">
+      <span>Speed</span>
+      <input type="range" id="speedSlider" min="1" max="10" value="5">
+    </div>
+  </div>
+
+  <div class="canvas-wrapper">
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <div class="sequence" id="sequenceDisplay"></div>
+
+  <div class="info-panel">
+    <div class="info-card">
+      <div class="label">Current Step</div>
+      <div class="value" id="infoStep">0</div>
+      <div class="detail">Fibonacci index</div>
+    </div>
+    <div class="info-card">
+      <div class="label">Fibonacci Number</div>
+      <div class="value" id="infoFib">0</div>
+      <div class="detail">Square side length</div>
+    </div>
+    <div class="info-card">
+      <div class="label">Ratio F(n)/F(n-1)</div>
+      <div class="value" id="infoRatio">--</div>
+      <div class="detail">Converges to φ</div>
+    </div>
+    <div class="info-card">
+      <div class="label">Error from φ</div>
+      <div class="value" id="infoError">--</div>
+      <div class="detail">Distance to golden ratio</div>
+    </div>
+  </div>
+
+  <div class="explanation">
+    Each new square's side equals the sum of the two before it: <em>F(n) = F(n-1) + F(n-2)</em>. As squares grow, the ratio between consecutive numbers approaches <em>φ (phi) ≈ 1.618...</em>, the golden ratio. The spiral connecting opposite corners of each square approximates a logarithmic spiral found throughout nature.
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+// Responsive canvas
+function setCanvasSize() {
+  const size = Math.min(window.innerWidth - 48, 800);
+  canvas.width = size;
+  canvas.height = size;
+}
+setCanvasSize();
+window.addEventListener('resize', () => { setCanvasSize(); draw(); });
+
+// State
+const PHI = (1 + Math.sqrt(5)) / 2;
+let fibs = [1, 1];
+let squares = [];
+let currentStep = 0;
+let maxSteps = 15;
+let isPlaying = false;
+let playTimer = null;
+let showSpiral = true;
+let showNumbers = true;
+let showDecomposition = true;
+let spiralProgress = 1; // 0..currentStep, animates
+let animFrame = null;
+
+// Direction order: down, left, up, right (starting from square index 2)
+const DIRS = ['down', 'left', 'up', 'right'];
+
+// Generate fibonacci numbers
+function ensureFibs(n) {
+  while (fibs.length <= n) {
+    fibs.push(fibs[fibs.length - 1] + fibs[fibs.length - 2]);
+  }
+}
+
+// Build square positions
+function buildSquares(steps) {
+  squares = [];
+  if (steps === 0) return;
+
+  // First square
+  squares.push({ x: 0, y: 0, size: 1, fib: 1, dir: 'right' });
+  if (steps === 1) return;
+
+  // Second square (to the right of first)
+  squares.push({ x: 1, y: 0, size: 1, fib: 1, dir: 'up' });
+
+  for (let i = 2; i < steps; i++) {
+    ensureFibs(i);
+    const size = fibs[i];
+    const dir = DIRS[(i - 2) % 4];
+
+    // Calculate bounding box of all existing squares
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const sq of squares) {
+      minX = Math.min(minX, sq.x);
+      minY = Math.min(minY, sq.y);
+      maxX = Math.max(maxX, sq.x + sq.size);
+      maxY = Math.max(maxY, sq.y + sq.size);
+    }
+
+    let x, y;
+    switch (dir) {
+      case 'right':
+        x = maxX;
+        y = minY;
+        break;
+      case 'up':
+        x = minX;
+        y = minY - size;
+        break;
+      case 'left':
+        x = minX - size;
+        y = maxY - size;
+        break;
+      case 'down':
+        x = maxX - size;
+        y = maxY;
+        break;
+    }
+
+    squares.push({ x, y, size, fib: fibs[i], dir });
+  }
+}
+
+// Color palette for squares
+function getSquareColor(index, total, alpha = 1) {
+  const hue = 38 + (index * 5) % 20; // gold range
+  const sat = 40 + (index * 3) % 30;
+  const light = 15 + (index * 2) % 15;
+  return `hsla(${hue}, ${sat}%, ${light}%, ${alpha})`;
+}
+
+function getBorderColor(index, isCurrent) {
+  if (isCurrent) return 'rgba(197, 163, 86, 0.9)';
+  const alpha = 0.15 + 0.03 * index;
+  return `rgba(197, 163, 86, ${Math.min(alpha, 0.5)})`;
+}
+
+// Draw everything
+function draw() {
+  const W = canvas.width;
+  const H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  if (squares.length === 0) return;
+
+  // Calculate transform to fit all squares
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const sq of squares) {
+    minX = Math.min(minX, sq.x);
+    minY = Math.min(minY, sq.y);
+    maxX = Math.max(maxX, sq.x + sq.size);
+    maxY = Math.max(maxY, sq.y + sq.size);
+  }
+
+  const worldW = maxX - minX;
+  const worldH = maxY - minY;
+  const padding = 0.12;
+  const scale = Math.min(
+    W * (1 - padding * 2) / worldW,
+    H * (1 - padding * 2) / worldH
+  );
+  const offsetX = (W - worldW * scale) / 2 - minX * scale;
+  const offsetY = (H - worldH * scale) / 2 - minY * scale;
+
+  function tx(x) { return x * scale + offsetX; }
+  function ty(y) { return y * scale + offsetY; }
+
+  // Draw squares
+  squares.forEach((sq, i) => {
+    const sx = tx(sq.x);
+    const sy = ty(sq.y);
+    const ss = sq.size * scale;
+    const isCurrent = i === squares.length - 1;
+
+    // Fill
+    ctx.fillStyle = getSquareColor(i, squares.length, isCurrent ? 0.4 : 0.2);
+    ctx.fillRect(sx, sy, ss, ss);
+
+    // Border
+    ctx.strokeStyle = getBorderColor(i, isCurrent);
+    ctx.lineWidth = isCurrent ? 2 : 1;
+    ctx.strokeRect(sx, sy, ss, ss);
+
+    // Glow on current
+    if (isCurrent) {
+      ctx.shadowColor = 'rgba(197, 163, 86, 0.3)';
+      ctx.shadowBlur = 20;
+      ctx.strokeRect(sx, sy, ss, ss);
+      ctx.shadowBlur = 0;
+    }
+
+    // Number label
+    if (showNumbers && ss > 20) {
+      ctx.fillStyle = isCurrent ? 'rgba(232, 213, 163, 0.9)' : 'rgba(197, 163, 86, 0.4)';
+      const fontSize = Math.max(10, Math.min(ss * 0.25, 40));
+      ctx.font = `300 ${fontSize}px 'JetBrains Mono', monospace`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(sq.fib, sx + ss / 2, sy + ss / 2);
+    }
+
+    // ── Decomposition overlay on the CURRENT square (when step >= 3) ──
+    // Shows F(n) = F(n-1) + F(n-2) as two dotted sub-regions
+    if (showDecomposition && isCurrent && squares.length >= 3) {
+      const prevSize = squares[i - 1].size;   // F(n-1)
+      const prev2Size = squares[i - 2].size;  // F(n-2)
+      const dir = DIRS[(i - 2) % 4];
+
+      const colorA = 'rgba(120, 200, 255, 0.6)';  // blue-ish for F(n-1)
+      const colorB = 'rgba(255, 150, 100, 0.6)';   // warm coral for F(n-2)
+      const fillA  = 'rgba(120, 200, 255, 0.08)';
+      const fillB  = 'rgba(255, 150, 100, 0.08)';
+
+      const pA = prevSize * scale;  // pixel size of F(n-1) part
+      const pB = prev2Size * scale; // pixel size of F(n-2) part
+
+      // The split direction depends on which side the square was added.
+      // The new square's side = F(n-1) + F(n-2).
+      // The split cuts across the side that aligns with the growth direction.
+      let splitLineX1, splitLineY1, splitLineX2, splitLineY2;
+      let regionA, regionB; // {x,y,w,h} for each sub-region
+      let labelAPos, labelBPos;
+
+      switch (dir) {
+        case 'right':
+          // Square extends to the right. Split horizontally: top part = F(n-2), bottom = F(n-1)
+          // because the side is vertical = F(n-1) + F(n-2), with F(n-1) at bottom (matching prev square)
+          splitLineX1 = sx; splitLineY1 = sy + pB;
+          splitLineX2 = sx + ss; splitLineY2 = sy + pB;
+          regionA = { x: sx, y: sy + pB, w: ss, h: pA };
+          regionB = { x: sx, y: sy, w: ss, h: pB };
+          labelAPos = { x: sx + ss / 2, y: sy + pB + pA / 2 };
+          labelBPos = { x: sx + ss / 2, y: sy + pB / 2 };
+          break;
+        case 'up':
+          // Square extends upward. Split vertically: left part = F(n-2), right = F(n-1)
+          splitLineX1 = sx + pB; splitLineY1 = sy;
+          splitLineX2 = sx + pB; splitLineY2 = sy + ss;
+          regionA = { x: sx + pB, y: sy, w: pA, h: ss };
+          regionB = { x: sx, y: sy, w: pB, h: ss };
+          labelAPos = { x: sx + pB + pA / 2, y: sy + ss / 2 };
+          labelBPos = { x: sx + pB / 2, y: sy + ss / 2 };
+          break;
+        case 'left':
+          // Square extends to the left. Split horizontally: bottom part = F(n-2), top = F(n-1)
+          splitLineX1 = sx; splitLineY1 = sy + pA;
+          splitLineX2 = sx + ss; splitLineY2 = sy + pA;
+          regionA = { x: sx, y: sy, w: ss, h: pA };
+          regionB = { x: sx, y: sy + pA, w: ss, h: pB };
+          labelAPos = { x: sx + ss / 2, y: sy + pA / 2 };
+          labelBPos = { x: sx + ss / 2, y: sy + pA + pB / 2 };
+          break;
+        case 'down':
+          // Square extends downward. Split vertically: right part = F(n-2), left = F(n-1)
+          splitLineX1 = sx + pA; splitLineY1 = sy;
+          splitLineX2 = sx + pA; splitLineY2 = sy + ss;
+          regionA = { x: sx, y: sy, w: pA, h: ss };
+          regionB = { x: sx + pA, y: sy, w: pB, h: ss };
+          labelAPos = { x: sx + pA / 2, y: sy + ss / 2 };
+          labelBPos = { x: sx + pA + pB / 2, y: sy + ss / 2 };
+          break;
+      }
+
+      // Fill sub-regions with translucent color
+      ctx.fillStyle = fillA;
+      ctx.fillRect(regionA.x, regionA.y, regionA.w, regionA.h);
+      ctx.fillStyle = fillB;
+      ctx.fillRect(regionB.x, regionB.y, regionB.w, regionB.h);
+
+      // Draw dotted split line
+      ctx.save();
+      ctx.setLineDash([6, 4]);
+      ctx.strokeStyle = 'rgba(232, 213, 163, 0.7)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(splitLineX1, splitLineY1);
+      ctx.lineTo(splitLineX2, splitLineY2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+
+      // Sub-region labels: show F(n-1) and F(n-2) values
+      const subFontSize = Math.max(9, Math.min(pB * 0.35, ss * 0.15, 28));
+
+      if (pA > 18 && ss > 30) {
+        ctx.font = `400 ${subFontSize}px 'JetBrains Mono', monospace`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = colorA;
+        ctx.fillText(prevSize, labelAPos.x, labelAPos.y);
+      }
+
+      if (pB > 14 && ss > 30) {
+        ctx.font = `400 ${Math.max(8, subFontSize * 0.85)}px 'JetBrains Mono', monospace`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = colorB;
+        ctx.fillText(prev2Size, labelBPos.x, labelBPos.y);
+      }
+
+      // Draw "F(n-1) + F(n-2) = F(n)" equation near the split, outside the square
+      if (ss > 50) {
+        const eqFontSize = Math.max(10, Math.min(14, ss * 0.06));
+        ctx.font = `300 ${eqFontSize}px 'JetBrains Mono', monospace`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        let eqX, eqY;
+        switch (dir) {
+          case 'right': eqX = sx + ss + 8; eqY = sy + pB; ctx.textAlign = 'left'; break;
+          case 'up':    eqX = sx + pB; eqY = sy - 10; break;
+          case 'left':  eqX = sx - 8; eqY = sy + pA; ctx.textAlign = 'right'; break;
+          case 'down':  eqX = sx + pA; eqY = sy + ss + 14; break;
+        }
+
+        // Colored parts of the equation
+        const eq = `${prevSize} + ${prev2Size} = ${sq.fib}`;
+        // Draw as single string but with a subtle glow
+        ctx.fillStyle = 'rgba(232, 213, 163, 0.7)';
+        ctx.shadowColor = 'rgba(197, 163, 86, 0.4)';
+        ctx.shadowBlur = 6;
+        ctx.fillText(eq, eqX, eqY);
+        ctx.shadowBlur = 0;
+      }
+
+      // Draw bracket/dimension lines along the side that gets split
+      if (ss > 40) {
+        ctx.save();
+        ctx.setLineDash([2, 3]);
+        ctx.lineWidth = 1;
+
+        const bracketOffset = 6;
+        let bx1, by1, bx2, by2, bx3, by3; // three points: start, split, end
+
+        switch (dir) {
+          case 'right':
+            bx1 = sx - bracketOffset; by1 = sy;
+            bx2 = sx - bracketOffset; by2 = sy + pB;
+            bx3 = sx - bracketOffset; by3 = sy + ss;
+            break;
+          case 'up':
+            bx1 = sx; by1 = sy + ss + bracketOffset;
+            bx2 = sx + pB; by2 = sy + ss + bracketOffset;
+            bx3 = sx + ss; by3 = sy + ss + bracketOffset;
+            break;
+          case 'left':
+            bx1 = sx + ss + bracketOffset; by1 = sy;
+            bx2 = sx + ss + bracketOffset; by2 = sy + pA;
+            bx3 = sx + ss + bracketOffset; by3 = sy + ss;
+            break;
+          case 'down':
+            bx1 = sx; by1 = sy - bracketOffset;
+            bx2 = sx + pA; by2 = sy - bracketOffset;
+            bx3 = sx + ss; by3 = sy - bracketOffset;
+            break;
+        }
+
+        // Draw the two segments in different colors
+        ctx.strokeStyle = colorA;
+        ctx.beginPath();
+        ctx.moveTo(bx1, by1);
+        ctx.lineTo(bx2, by2);
+        ctx.stroke();
+
+        // Tick marks at endpoints
+        const isHoriz = (dir === 'up' || dir === 'down');
+        const tickLen = 4;
+
+        ctx.strokeStyle = colorA;
+        ctx.beginPath();
+        if (isHoriz) {
+          ctx.moveTo(bx1, by1 - tickLen); ctx.lineTo(bx1, by1 + tickLen);
+          ctx.moveTo(bx2, by2 - tickLen); ctx.lineTo(bx2, by2 + tickLen);
+        } else {
+          ctx.moveTo(bx1 - tickLen, by1); ctx.lineTo(bx1 + tickLen, by1);
+          ctx.moveTo(bx2 - tickLen, by2); ctx.lineTo(bx2 + tickLen, by2);
+        }
+        ctx.stroke();
+
+        ctx.strokeStyle = colorB;
+        ctx.beginPath();
+        ctx.moveTo(bx2, by2);
+        ctx.lineTo(bx3, by3);
+        ctx.stroke();
+
+        ctx.beginPath();
+        if (isHoriz) {
+          ctx.moveTo(bx3, by3 - tickLen); ctx.lineTo(bx3, by3 + tickLen);
+        } else {
+          ctx.moveTo(bx3 - tickLen, by3); ctx.lineTo(bx3 + tickLen, by3);
+        }
+        ctx.stroke();
+
+        ctx.setLineDash([]);
+        ctx.restore();
+      }
+    }
+  });
+
+  // Draw spiral
+  // Golden spiral: quarter-circle arcs in each square, all drawn clockwise (anticlockwise=false).
+  // Arc pivot corners and angles cycle every 4 squares (by square index i):
+  //   i%4=0: pivot=BR, π → 1.5π
+  //   i%4=1: pivot=BL, 1.5π → 2π
+  //   i%4=2: pivot=TL, 0 → 0.5π
+  //   i%4=3: pivot=TR, 0.5π → π
+
+  if (showSpiral && squares.length >= 1) {
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(197, 163, 86, 0.85)';
+    ctx.lineWidth = 2.5;
+    ctx.shadowColor = 'rgba(197, 163, 86, 0.5)';
+    ctx.shadowBlur = 10;
+
+    let first = true;
+    const spiralSteps = Math.min(Math.floor(spiralProgress), squares.length);
+
+    function getArcParams(sq, idx) {
+      const sx = tx(sq.x);
+      const sy = ty(sq.y);
+      const ss = sq.size * scale;
+      let cx, cy, startAngle, endAngle;
+
+      switch (idx % 4) {
+        case 0: // pivot = bottom-right
+          cx = sx + ss; cy = sy + ss;
+          startAngle = Math.PI; endAngle = 1.5 * Math.PI;
+          break;
+        case 1: // pivot = bottom-left
+          cx = sx; cy = sy + ss;
+          startAngle = 1.5 * Math.PI; endAngle = 2 * Math.PI;
+          break;
+        case 2: // pivot = top-left
+          cx = sx; cy = sy;
+          startAngle = 0; endAngle = 0.5 * Math.PI;
+          break;
+        case 3: // pivot = top-right
+          cx = sx + ss; cy = sy;
+          startAngle = 0.5 * Math.PI; endAngle = Math.PI;
+          break;
+      }
+      return { cx, cy, r: ss, startAngle, endAngle };
+    }
+
+    for (let i = 0; i < spiralSteps; i++) {
+      const { cx, cy, r, startAngle, endAngle } = getArcParams(squares[i], i);
+
+      // Partial arc for currently animating step
+      let arcEnd = endAngle;
+      if (i === spiralSteps - 1 && spiralProgress % 1 !== 0) {
+        const frac = spiralProgress % 1;
+        arcEnd = startAngle + (endAngle - startAngle) * frac;
+      }
+
+      if (first) {
+        const startX = cx + r * Math.cos(startAngle);
+        const startY = cy + r * Math.sin(startAngle);
+        ctx.moveTo(startX, startY);
+        first = false;
+      }
+      ctx.arc(cx, cy, r, startAngle, arcEnd, false);
+    }
+
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Glowing dot at spiral tip
+    if (spiralSteps > 0) {
+      const { cx, cy, r, startAngle, endAngle } = getArcParams(squares[spiralSteps - 1], spiralSteps - 1);
+
+      let arcEnd = endAngle;
+      if (spiralProgress % 1 !== 0) {
+        const frac = spiralProgress % 1;
+        arcEnd = startAngle + (endAngle - startAngle) * frac;
+      }
+
+      const dotX = cx + r * Math.cos(arcEnd);
+      const dotY = cy + r * Math.sin(arcEnd);
+
+      ctx.beginPath();
+      ctx.arc(dotX, dotY, 4, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(232, 213, 163, 0.95)';
+      ctx.shadowColor = 'rgba(197, 163, 86, 0.8)';
+      ctx.shadowBlur = 15;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+  }
+}
+
+// Update info displays
+function updateInfo() {
+  ensureFibs(currentStep);
+  document.getElementById('infoStep').textContent = currentStep;
+  document.getElementById('infoFib').textContent = currentStep > 0 ? fibs[currentStep - 1] : 0;
+
+  if (currentStep >= 2) {
+    const ratio = fibs[currentStep - 1] / fibs[currentStep - 2];
+    document.getElementById('infoRatio').textContent = ratio.toFixed(8);
+    const error = Math.abs(ratio - PHI);
+    document.getElementById('infoError').textContent = error.toExponential(3);
+  } else {
+    document.getElementById('infoRatio').textContent = '--';
+    document.getElementById('infoError').textContent = '--';
+  }
+
+  // Sequence display
+  const seqEl = document.getElementById('sequenceDisplay');
+  ensureFibs(maxSteps);
+  let html = '';
+  for (let i = 0; i < Math.max(currentStep, 12); i++) {
+    ensureFibs(i);
+    const cls = i < currentStep - 1 ? 'active' : i === currentStep - 1 ? 'current' : '';
+    html += `<span class="${cls}">${fibs[i]}</span>`;
+    if (i < Math.max(currentStep, 12) - 1) html += '<span style="color:var(--gold-dim);">,</span> ';
+  }
+  if (currentStep < maxSteps) html += '<span style="color:var(--text-dim);">, ...</span>';
+  seqEl.innerHTML = html;
+}
+
+// Animation for spiral drawing
+let spiralAnimTarget = 0;
+
+function animateSpiral() {
+  if (spiralProgress < spiralAnimTarget) {
+    spiralProgress += 0.04;
+    if (spiralProgress >= spiralAnimTarget) {
+      spiralProgress = spiralAnimTarget;
+    }
+    draw();
+    animFrame = requestAnimationFrame(animateSpiral);
+  }
+}
+
+// Step forward
+function step() {
+  if (currentStep >= maxSteps) return;
+  currentStep++;
+  buildSquares(currentStep);
+  spiralAnimTarget = currentStep;
+
+  if (animFrame) cancelAnimationFrame(animFrame);
+  animateSpiral();
+
+  updateInfo();
+  draw();
+}
+
+// Reset
+function reset() {
+  stopPlay();
+  currentStep = 0;
+  squares = [];
+  spiralProgress = 0;
+  spiralAnimTarget = 0;
+  if (animFrame) cancelAnimationFrame(animFrame);
+  updateInfo();
+  draw();
+}
+
+// Play/pause
+function togglePlay() {
+  if (isPlaying) {
+    stopPlay();
+  } else {
+    startPlay();
+  }
+}
+
+function startPlay() {
+  if (currentStep >= maxSteps) reset();
+  isPlaying = true;
+  document.getElementById('btnPlay').textContent = '⏸ Pause';
+  document.getElementById('btnPlay').classList.add('active');
+  playNext();
+}
+
+function stopPlay() {
+  isPlaying = false;
+  if (playTimer) clearTimeout(playTimer);
+  document.getElementById('btnPlay').textContent = '▶ Play';
+  document.getElementById('btnPlay').classList.remove('active');
+}
+
+function getSpeed() {
+  const val = document.getElementById('speedSlider').value;
+  return 1200 - val * 100; // 200ms to 1100ms
+}
+
+function playNext() {
+  if (!isPlaying) return;
+  if (currentStep >= maxSteps) {
+    stopPlay();
+    return;
+  }
+  step();
+  playTimer = setTimeout(playNext, getSpeed());
+}
+
+// Toggle buttons
+function toggleSpiral() {
+  showSpiral = !showSpiral;
+  document.getElementById('btnToggleSpiral').textContent = `Spiral: ${showSpiral ? 'On' : 'Off'}`;
+  draw();
+}
+
+function toggleNumbers() {
+  showNumbers = !showNumbers;
+  document.getElementById('btnToggleNumbers').textContent = `Numbers: ${showNumbers ? 'On' : 'Off'}`;
+  draw();
+}
+
+function toggleDecomp() {
+  showDecomposition = !showDecomposition;
+  document.getElementById('btnToggleDecomp').textContent = `Sum Split: ${showDecomposition ? 'On' : 'Off'}`;
+  draw();
+}
+
+// Event listeners
+document.getElementById('btnPlay').addEventListener('click', togglePlay);
+document.getElementById('btnStep').addEventListener('click', step);
+document.getElementById('btnReset').addEventListener('click', reset);
+document.getElementById('btnToggleSpiral').addEventListener('click', toggleSpiral);
+document.getElementById('btnToggleNumbers').addEventListener('click', toggleNumbers);
+document.getElementById('btnToggleDecomp').addEventListener('click', toggleDecomp);
+
+// Init
+updateInfo();
+draw();
+</script>
+</body>
+</html>
