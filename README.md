@@ -20,6 +20,8 @@ The visualization builds the classic Fibonacci rectangle tiling and draws the go
 
 Open `index.html` in any modern browser. No build step, no server, no dependencies.
 
+E.g.on ![ https://delastone1-gif.github.io/The-Golden-Spiral/]( https://delastone1-gif.github.io/The-Golden-Spiral/)
+
 ## Controls
 
 | Button | Action |
