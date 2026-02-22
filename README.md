@@ -18,9 +18,9 @@ The visualization builds the classic Fibonacci rectangle tiling and draws the go
 
 ## Demo
 
-Open `index.html` in any modern browser. No build step, no server, no dependencies.
+**[Live Demo](https://delastone1-gif.github.io/The-Golden-Spiral/)** -- try it directly in your browser.
 
-E.g.on ![ https://delastone1-gif.github.io/The-Golden-Spiral/]( https://delastone1-gif.github.io/The-Golden-Spiral/)
+Or download `index.html` and open it locally. No build step, no server, no dependencies.
 
 ## Controls
 
